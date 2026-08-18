@@ -41,6 +41,11 @@ services:
       REDIS_URL: redis://redis:6379
       JWT_SECRET: dev-secret-change-in-production
       FRONTEND_URL: http://localhost:3000
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: ${GOOGLE_EMAIL}
+      SMTP_PASS: ${GOOGLE_PASS}
+      SMTP_FROM: '"E-REAL Scheduler" <${GOOGLE_EMAIL}>'
       WORKER_CONCURRENCY: 5
       RATE_LIMIT_EMAILS_PER_MINUTE: 10
       RATE_LIMIT_MAX: 30

@@ -35,7 +35,7 @@ router.get('/', async (req, res) => {
     res.json(emails);
   } catch (err) {
     if (err.name === 'ZodError') {
-      return res.status(400).json({ error: 'Invalid status filter', details: err.errors });
+      return res.status(400).json({ error: 'Invalid status filter', details: err.issues });
     }
     res.status(500).json({ error: 'Failed to fetch emails' });
   }
