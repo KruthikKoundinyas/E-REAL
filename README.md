@@ -228,7 +228,6 @@ All endpoints except auth need `Authorization: Bearer <token>`.
 
 **Known shortcuts:**
 - No unit or integration tests
-- No input validation library (would use zod in production)
 - No email templates
 - No pagination on list endpoints
 - No forgot-password flow
