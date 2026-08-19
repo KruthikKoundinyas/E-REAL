@@ -1,21 +1,47 @@
 const { Worker } = require('bullmq');
 const { getRedis } = require('../config/redis');
 const { pool } = require('../config/database');
-const nodemailer = require('nodemailer');
+const { OAuth2Client } = require('google-auth-library');
 const { EMAIL_QUEUE_NAME } = require('../services/emailService');
 
-function createOAuth2Transporter(user) {
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      type: 'OAuth2',
-      user: user.email,
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      refreshToken: user.google_refresh_token,
-      accessToken: user.google_access_token,
-    },
+async function getAccessToken(user) {
+  const oauth2Client = new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET
+  );
+  oauth2Client.setCredentials({
+    refresh_token: user.google_refresh_token,
   });
+  const { token } = await oauth2Client.getAccessToken();
+  return token;
+}
+
+function buildRawEmail({ from, to, subject, textBody, htmlBody }) {
+  const boundary = 'boundary_' + Date.now();
+  const lines = [
+    `From: ${from}`,
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+    '',
+    textBody,
+    '',
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    '',
+    htmlBody,
+    '',
+    `--${boundary}--`,
+  ];
+  return Buffer.from(lines.join('\r\n'))
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
 
 function startEmailWorker() {
@@ -47,7 +73,8 @@ function startEmailWorker() {
         throw new Error('User has no Google credentials — please re-authenticate');
       }
 
-      const transporter = createOAuth2Transporter(user);
+      const accessToken = await getAccessToken(user);
+
       const escapedBody = email.body
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
@@ -55,21 +82,40 @@ function startEmailWorker() {
         .replace(/"/g, '&quot;')
         .replace(/\n/g, '<br>');
 
-      const info = await transporter.sendMail({
+      const raw = buildRawEmail({
         from: user.email,
         to: email.recipient,
         subject: email.subject,
-        text: email.body,
-        html: `<p>${escapedBody}</p>`,
+        textBody: email.body,
+        htmlBody: `<p>${escapedBody}</p>`,
       });
+
+      const response = await fetch(
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ raw }),
+        }
+      );
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(`Gmail API error: ${err.error?.message || response.statusText}`);
+      }
+
+      const data = await response.json();
 
       await pool.query(
         "UPDATE emails SET status = 'sent', sent_at = NOW() WHERE id = $1",
         [emailId]
       );
 
-      console.log(`Email ${emailId} sent via Gmail OAuth. MessageId: ${info.messageId}`);
-      return { sent: true, messageId: info.messageId };
+      console.log(`Email ${emailId} sent via Gmail API. MessageId: ${data.id}`);
+      return { sent: true, messageId: data.id };
     },
     {
       connection: getRedis(),

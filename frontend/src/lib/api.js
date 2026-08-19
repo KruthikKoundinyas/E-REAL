@@ -34,4 +34,8 @@ export const api = {
     request('/emails/stats'),
   scheduleEmail: (data) =>
     request('/emails/schedule', { method: 'POST', body: JSON.stringify(data) }),
+  retryEmail: (id) =>
+    request(`/emails/retry/${id}`, { method: 'POST' }),
+  deleteEmail: (id) =>
+    request(`/emails/${id}`, { method: 'DELETE' }),
 };
