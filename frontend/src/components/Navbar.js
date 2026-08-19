@@ -1,14 +1,9 @@
 'use client';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useAuth } from '../lib/useAuth';
 
 export default function Navbar() {
-  const router = useRouter();
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    router.replace('/login');
-  };
+  const { user, logout } = useAuth();
 
   return (
     <nav className="bg-white border-b border-gray-200">
@@ -23,8 +18,21 @@ export default function Navbar() {
           <Link href="/compose" className="text-sm text-gray-600 hover:text-gray-900">
             Compose
           </Link>
+          {user && (
+            <div className="flex items-center gap-2">
+              {user.avatar_url && (
+                <img
+                  src={user.avatar_url}
+                  alt=""
+                  className="w-6 h-6 rounded-full"
+                  referrerPolicy="no-referrer"
+                />
+              )}
+              <span className="text-sm text-gray-600">{user.name || user.email}</span>
+            </div>
+          )}
           <button
-            onClick={handleLogout}
+            onClick={logout}
             className="text-sm text-gray-500 hover:text-red-600"
           >
             Logout

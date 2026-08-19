@@ -11,7 +11,12 @@ async function initDatabase() {
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         email VARCHAR(255) UNIQUE NOT NULL,
-        password_hash VARCHAR(255) NOT NULL,
+        password_hash VARCHAR(255),
+        google_id VARCHAR(255) UNIQUE,
+        name VARCHAR(255),
+        avatar_url TEXT,
+        google_access_token TEXT,
+        google_refresh_token TEXT,
         created_at TIMESTAMP DEFAULT NOW()
       );
 
@@ -32,6 +37,14 @@ async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_emails_status ON emails(status);
       CREATE INDEX IF NOT EXISTS idx_emails_scheduled_at ON emails(scheduled_at);
       CREATE INDEX IF NOT EXISTS idx_emails_user_id ON emails(user_id);
+
+      -- Migrate existing schema: make password_hash nullable, add Google columns
+      ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255) UNIQUE;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS google_access_token TEXT;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS google_refresh_token TEXT;
     `);
     console.log('Database initialized');
   } finally {
